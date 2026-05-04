@@ -1,7 +1,0 @@
-name: SnakeGame
-version: '1.0'
-main: dev.dipper.snakeGame.SnakeGame
-api-version: '1.21.11'
-authors: [ DipperCypher ]
-commands: 
-  start: { }
