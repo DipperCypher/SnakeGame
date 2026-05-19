@@ -10,6 +10,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 import dev.dipper.snakeGame.SnakeGame;
@@ -17,8 +18,8 @@ import dev.dipper.snakeGame.direction.Direction;
 import net.md_5.bungee.api.ChatColor;
 
 public class SnakeManager {
-    public final String TURN_LEFT_ITEM_NAME = ChatColor.GREEN + "Snake Turn Left";
-    public final String TURN_RIGHT_ITEM_NAME = ChatColor.GREEN + "Snake Turn Right";
+    private final String TURN_LEFT_ITEM_NAME = ChatColor.GREEN + "Snake Turn Left";
+    private final String TURN_RIGHT_ITEM_NAME = ChatColor.GREEN + "Snake Turn Right";
 
     private final Material WALL_MATERIAL = Material.BLACK_CONCRETE;
     private final Material BOARD_MATERIAL = Material.LIGHT_BLUE_CONCRETE;
@@ -26,26 +27,40 @@ public class SnakeManager {
     private final Material SNAKE_TAIL_MATERIAL = Material.GREEN_CONCRETE;
     private final Material FOOD_MATERIAL = Material.RED_CONCRETE;
 
-    public List<Location> snake = new ArrayList<>();
-    public Direction direction = Direction.UP;
-    public Location food;
-    public boolean started;
-    public BukkitTask task;
-    public SnakeGame plugin;
+    private List<Location> snake = new ArrayList<>();
+    private Direction direction = Direction.UP;
+    private Location food;
+    private boolean started;
+    private BukkitTask gameTask;
+    private SnakeGame plugin;
+    private BukkitTask countdownTask;
+    private int countDown = 5;
 
-    public int boardSize = 17;
-    public Location origin;
+    private int boardSize = 21;
+    private Location origin;
 
     public SnakeManager(SnakeGame plugin) {
         this.plugin = plugin;
     }
 
-    // Main handel starting the game
     public void startGame(Player player) {
-        if (task != null) task.cancel();
-
+        if (gameTask != null) gameTask.cancel();
+        if (countdownTask != null) countdownTask.cancel();
         started = true;
-        origin = player.getLocation().getBlock().getLocation().add(0, -1, 0);
+
+        Location playerLoc = player.getLocation();
+        Location ground = playerLoc.clone().add(0, 20, 0);
+
+        Location sky = ground.clone().add(0, 100, 0);
+        player.setAllowFlight(true);
+        player.setFlying(true);
+
+        Location lookDown = sky.clone();
+        lookDown.setPitch(90);
+        player.teleport(lookDown);
+
+        int center = (boardSize - 1) / 2;
+        origin = player.getLocation().clone().subtract(center, 5, center);
 
         snake.clear();
         snake.add(origin.clone().add(7, 0, 7));
@@ -56,17 +71,27 @@ public class SnakeManager {
         giveControlItems(player);
         spawnFood();
         drawBoard();
-
-        task = Bukkit.getScheduler().runTaskTimer(plugin, this::tickTask, 0L, 9L);
+        startCountDown(player);
     }
 
-    // Main handel giving control items to player
-    public void giveControlItems(Player player) {
-        player.getInventory().setItem(0, createControlItem(Material.LIME_DYE, TURN_LEFT_ITEM_NAME));
-        player.getInventory().setItem(1, createControlItem(Material.GREEN_DYE, TURN_RIGHT_ITEM_NAME));
+    private void startCountDown(Player player) {
+        countdownTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (countDown == 0) {
+                    player.sendMessage(ChatColor.GREEN + "GOOO");
+                    gameTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tickTask(player), 0L, 8L);
+                    countDown = 5;
+                    countdownTask.cancel();
+                    return;
+                }
+
+                player.sendMessage(ChatColor.AQUA + "Starting in... " + countDown);
+                countDown--;
+            }
+        }.runTaskTimer(plugin, 0L, 9L);
     }
 
-    // Main handel creating control items
     private ItemStack createControlItem(Material material, String name) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
@@ -79,59 +104,48 @@ public class SnakeManager {
         return item;
     }
 
-    // Main handel the game tick
-    private void tickTask() {
+    private void tickTask(Player player) {
         Location head = snake.get(0).clone().add(direction.dx, 0, direction.dz);
 
         if (isWall(head) || containSnake(head)) {
-            
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                player.sendMessage(ChatColor.RED + "Game Over Score: " + (snake.size() - 3));
-            }
-
-            started = false;
-            task.cancel();
+            gameOver(player);
             return;
         }
 
         snake.add(0, head);
+        boolean ate = sameBlock(head, food);
 
-        if (sameBlock(head, food)) {
-            spawnFood();
-        } else {
+        if (!ate) {
             Location tail = snake.remove(snake.size() - 1);
             tail.getBlock().setType(BOARD_MATERIAL);
+        } else {
+            spawnFood();
         }
 
         drawBoard();
-
     }
 
-    // Main handel drawing the board
-    public void drawBoard() {
+    private void drawBoard() {
         for (int x = 0; x < boardSize; x++) {
             for (int z = 0; z < boardSize; z++) {
                 Location block = origin.clone().add(x, 0, z);
                 boolean border = x == 0 || z == 0 || x == boardSize -1 || z == boardSize -1;
 
-                if (border) {
-                    block.getBlock().setType(WALL_MATERIAL);
-                } else {
-                    block.getBlock().setType(BOARD_MATERIAL);
-                }
+                block.getBlock().setType(border ? WALL_MATERIAL : BOARD_MATERIAL);
             }
         }
 
         for (int i = 0; i < snake.size(); i++) {
-            Material material = i == 0 ? SNAKE_HEAD_MATERIAL : SNAKE_TAIL_MATERIAL;
+            Material material = (i == 0) ? SNAKE_HEAD_MATERIAL : SNAKE_TAIL_MATERIAL;
             snake.get(i).getBlock().setType(material);
         }
 
-        food.getBlock().setType(FOOD_MATERIAL);
+        if (food != null) {
+            food.getBlock().setType(FOOD_MATERIAL);
+        }
     }
 
-    // Main handel spawning food
-    public void spawnFood() {
+    private void spawnFood() {
         Random random = new Random();
 
         do {
@@ -141,33 +155,58 @@ public class SnakeManager {
         } while (containSnake(food));
     }
 
-    // Main handel checking if the location is wall
-    public boolean isWall(Location location) {
+    private boolean isWall(Location location) {
         int x = location.getBlockX() - origin.getBlockX();
         int z = location.getBlockZ() - origin.getBlockZ();
         return x <= 0 || z <= 0 || x >= boardSize -1 || z >= boardSize -1;
     }
 
-    // Main handel checking if the location contain snake
+    private void gameOver(Player player) {
+        started = false;
+        gameTask.cancel();
+        countdownTask.cancel();
+
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        player.sendMessage(ChatColor.RED + "Game Over Score: " + (snake.size() - 3));
+    }
+
+    private void giveControlItems(Player player) {
+        player.getInventory().setItem(0, createControlItem(Material.LIME_DYE, TURN_LEFT_ITEM_NAME));
+        player.getInventory().setItem(1, createControlItem(Material.GREEN_DYE, TURN_RIGHT_ITEM_NAME));
+    }
+
     public boolean containSnake(Location location) {
         return snake.stream().anyMatch(part -> sameBlock(part, location));
     }
 
-    // Main handel checking if two location is the same block
     public boolean sameBlock(Location a, Location b) {
         return a.getBlockX() == b.getBlockX() 
         && a.getBlockY() == b.getBlockY() 
         && a.getBlockZ() == b.getBlockZ();
     }
 
-    // Getters
     public List<Location> getSnake() {
         return snake;
     }
     
-    // Getters
     public boolean getStarted() {
         return started;
     }
 
+    public Direction getDirection() {
+        return direction;
+    }
+
+    public void setDirection(Direction direction) {
+        this.direction = direction;
+    }
+
+    public String getLeftItem() {
+        return TURN_LEFT_ITEM_NAME;
+    }
+
+    public String getRightItem() {
+        return TURN_RIGHT_ITEM_NAME;
+    }
 }

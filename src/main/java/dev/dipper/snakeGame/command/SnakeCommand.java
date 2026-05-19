@@ -24,11 +24,7 @@ public class SnakeCommand implements CommandExecutor {
 
         Player player = (Player) sender;
 
-        if (!player.hasPermission("snake.start")) {
-            player.sendMessage(ChatColor.RED + "You don't have access");
-            return true;
-        }
-
+        player.getInventory().clear();
         manager.startGame(player);
         player.sendMessage(ChatColor.AQUA + "Game Started, Have fun ;)");
         return true;
