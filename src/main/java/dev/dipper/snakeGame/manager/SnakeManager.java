@@ -5,8 +5,11 @@ import java.util.List;
 import java.util.Random;
 
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Sound;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -15,14 +18,17 @@ import org.bukkit.scheduler.BukkitTask;
 
 import dev.dipper.snakeGame.SnakeGame;
 import dev.dipper.snakeGame.direction.Direction;
+import dev.dipper.snakeGame.world.WorldManager;
 import net.md_5.bungee.api.ChatColor;
 
 public class SnakeManager {
+    private SnakeGame plugin;
+
     private final String TURN_LEFT_ITEM_NAME = ChatColor.GREEN + "Snake Turn Left";
     private final String TURN_RIGHT_ITEM_NAME = ChatColor.GREEN + "Snake Turn Right";
 
     private final Material WALL_MATERIAL = Material.BLACK_CONCRETE;
-    private final Material BOARD_MATERIAL = Material.LIGHT_BLUE_CONCRETE;
+    private final Material BOARD_MATERIAL = Material.WHITE_CONCRETE;
     private final Material SNAKE_HEAD_MATERIAL = Material.LIME_CONCRETE;
     private final Material SNAKE_TAIL_MATERIAL = Material.GREEN_CONCRETE;
     private final Material FOOD_MATERIAL = Material.RED_CONCRETE;
@@ -32,13 +38,12 @@ public class SnakeManager {
     private Location food;
     private boolean started;
     private BukkitTask gameTask;
-    private SnakeGame plugin;
     private BukkitTask countdownTask;
     private int countDown = 5;
 
-    private int boardSize = 21;
+    private int boardSize = 20;
     private Location origin;
-
+ 
     public SnakeManager(SnakeGame plugin) {
         this.plugin = plugin;
     }
@@ -51,7 +56,7 @@ public class SnakeManager {
         Location playerLoc = player.getLocation();
         Location ground = playerLoc.clone().add(0, 20, 0);
 
-        Location sky = ground.clone().add(0, 100, 0);
+        Location sky = ground.clone().add(0, 300, 0);
         player.setAllowFlight(true);
         player.setFlying(true);
 
@@ -69,8 +74,9 @@ public class SnakeManager {
 
         direction = Direction.UP;
         giveControlItems(player);
-        spawnFood();
+        generateBoard();
         drawBoard();
+        spawnFood();
         startCountDown(player);
     }
 
@@ -80,7 +86,7 @@ public class SnakeManager {
             public void run() {
                 if (countDown == 0) {
                     player.sendMessage(ChatColor.GREEN + "GOOO");
-                    gameTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tickTask(player), 0L, 8L);
+                    gameTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tickTask(player), 0L, 6L);
                     countDown = 5;
                     countdownTask.cancel();
                     return;
@@ -112,29 +118,40 @@ public class SnakeManager {
             return;
         }
 
+        snake.get(0).getBlock().setType(SNAKE_TAIL_MATERIAL);
         snake.add(0, head);
+
         boolean ate = sameBlock(head, food);
+        head.getBlock().setType(SNAKE_HEAD_MATERIAL);
 
         if (!ate) {
             Location tail = snake.remove(snake.size() - 1);
             tail.getBlock().setType(BOARD_MATERIAL);
         } else {
             spawnFood();
+            food.getBlock().setType(FOOD_MATERIAL);
         }
 
         drawBoard();
     }
 
-    private void drawBoard() {
+    private void generateBoard() {
+        World world = origin.getWorld();
+
+        int baseX = origin.getBlockX();
+        int baseY = origin.getBlockY();
+        int baseZ = origin.getBlockZ();
+
         for (int x = 0; x < boardSize; x++) {
             for (int z = 0; z < boardSize; z++) {
-                Location block = origin.clone().add(x, 0, z);
-                boolean border = x == 0 || z == 0 || x == boardSize -1 || z == boardSize -1;
 
-                block.getBlock().setType(border ? WALL_MATERIAL : BOARD_MATERIAL);
+                boolean border = x == 0 || z == 0 || x == boardSize -1 || z == boardSize -1;
+                world.getBlockAt(baseX + x, baseY, baseZ + z).setType(border ? WALL_MATERIAL : BOARD_MATERIAL);
             }
         }
+    }
 
+    private void drawBoard() {
         for (int i = 0; i < snake.size(); i++) {
             Material material = (i == 0) ? SNAKE_HEAD_MATERIAL : SNAKE_TAIL_MATERIAL;
             snake.get(i).getBlock().setType(material);
@@ -162,13 +179,18 @@ public class SnakeManager {
     }
 
     private void gameOver(Player player) {
+        int score = snake.size();
+
         started = false;
         gameTask.cancel();
         countdownTask.cancel();
+        snake.clear();
 
         player.setFlying(false);
         player.setAllowFlight(false);
-        player.sendMessage(ChatColor.RED + "Game Over Score: " + (snake.size() - 3));
+        player.setGameMode(GameMode.SURVIVAL);
+        player.sendMessage(ChatColor.RED + "Game Over Score: " + ChatColor.WHITE + score);
+        player.playSound(player, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1, 1);
     }
 
     private void giveControlItems(Player player) {

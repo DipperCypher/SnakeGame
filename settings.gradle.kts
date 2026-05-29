@@ -16,4 +16,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "SnakeGame"
-includeBuild("D:/DipperCode/plugin/NexisMenuGradle")
+includeBuild("D:/DipperCode/plugin/NexisMenu")

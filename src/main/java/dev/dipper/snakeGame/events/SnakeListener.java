@@ -1,9 +1,8 @@
-package dev.dipper.snakeGame.evnts;
+package dev.dipper.snakeGame.events;
 
 import dev.dipper.snakeGame.SnakeGame;
 import dev.dipper.snakeGame.manager.SnakeManager;
 
-import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -48,7 +47,6 @@ public class SnakeListener implements Listener {
 
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
-        Player player = event.getPlayer();
         if (!smanager.getStarted()) return;
         event.setCancelled(true);
     }

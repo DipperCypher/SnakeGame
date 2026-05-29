@@ -17,12 +17,15 @@ public class SnakeCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player)) {
+        if (!(sender instanceof Player player)) {
             sender.sendMessage("This command can only be used by players.");
             return true;
         }
 
-        Player player = (Player) sender;
+        if (manager.getStarted()) {
+            player.sendMessage(ChatColor.RED + "Game Already Started!");
+            return true;
+        }
 
         player.getInventory().clear();
         manager.startGame(player);

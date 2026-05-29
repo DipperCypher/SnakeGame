@@ -1,8 +1,27 @@
+# Gradle
 .gradle/
 build/
-bin/
-run/
+
+# IDEs
 .idea/
+.vscode/
+*.iml
+
+# Runtime / test server
+run/
+
+# Compiled files
+bin/
+out/
 *.class
+
+# Build artifacts
 *.jar
 
+# OS files
+.DS_Store
+Thumbs.db
+
+# GitHub
+.github/
+TODOLIST.md
