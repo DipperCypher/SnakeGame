@@ -18,7 +18,6 @@ import org.bukkit.scheduler.BukkitTask;
 
 import dev.dipper.snakeGame.SnakeGame;
 import dev.dipper.snakeGame.direction.Direction;
-import dev.dipper.snakeGame.world.WorldManager;
 import net.md_5.bungee.api.ChatColor;
 
 public class SnakeManager {
